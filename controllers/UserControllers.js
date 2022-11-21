@@ -1,5 +1,9 @@
 const User = require("../models/UserModel");
+const bcrypt = require('bcrypt')
+const salt = 'MisionTic2022'
+const saltRounds = 10
 
+//endPoint to create user
 const createUser = ({ body }, res) => {
   //desestructuracion del body
   const { firstname, lastname, email, password } = body;
@@ -17,16 +21,26 @@ const createUser = ({ body }, res) => {
       res.send({ message: "Existe un usuario con este email" });
     } else if (!userFinded) {
       //ToDo: falta encriptar el password, bcrypt
-      newUser.save((error, userSaved) => {
-        if (error) {
-          res.send({ message: `Error del servidor: ${error}` });
-        } else if (userSaved) {
-          //sino hay errores entonces podemos guardar el usuario
-          res.send({ message: "Usuario creado con éxito" });
-        } else {
-          res.send({ message: "Usuario no se pudo guardar, error BD" });
+      const passwordToHash = newUser.password + salt //generacion del password agregando un salt
+      bcrypt.hash( passwordToHash, saltRounds, (err, hash) => {
+        if(err){
+          res.send({ message: 'Error del servidor ' + err})
+        }else if(!hash){
+          res.send( { message: 'No se pudo encriptar el password'})
+        }else{
+          newUser.password = hash;
+          newUser.save((error, userSaved) => {
+            if (error) {
+              res.send({ message: `Error del servidor: ${error}` });
+            } else if (userSaved) {
+              //sino hay errores entonces podemos guardar el usuario
+              res.send( { message: "Usuario creado con éxito", status: 200 } );
+            } else {
+              res.send({ message: "Usuario no se pudo guardar, error BD" });
+            }
+          });
         }
-      });
+      })
     } else {
       res.send({ message: `Error del servidor: ${err}` });
     }
@@ -59,6 +73,7 @@ const createUser = ({ body }, res) => {
   //   res.send(result);
 };
 
+// endPoint to update user
 const updateUser = function (req, res) {
   const idToUpdate = req.params.id;
   const { body } = req;
@@ -78,48 +93,17 @@ const updateUser = function (req, res) {
           user: userFinded,
         });
       } else {
-        User.findByIdAndUpdate(
-          idToUpdate,
-          userToUpdate,
-          { returnDocument: "after" },
-          (err, userUpdated) => {
-            if (err) {
-              res.status(500).send({ message: `Error del servidor: ${err}` });
-            } else if (!userUpdated) {
-              res.send({ message: "No se pudo actualizar usuario" });
-            } else {
-              res.send({
-                message: "Usuario actualizado correctamente",
-                user: userFinded,
-              });
-            }
-          }
-        );
+        userFindAndUpdate(idToUpdate, userToUpdate, res);
       }
     } else if (!userFinded) {
-      User.findByIdAndUpdate(
-        idToUpdate,
-        userToUpdate,
-        { returnDocument: "after" },
-        (err, userUpdated) => {
-          if (err) {
-            res.status(500).send({ message: `Error del servidor: ${err}` });
-          } else if (!userUpdated) {
-            res.send({ message: "No se pudo actualizar usuario" });
-          } else {
-            res.send({
-              message: "Usuario actualizado correctamente",
-              user: userFinded,
-            });
-          }
-        }
-      );
+      userFindAndUpdate(idToUpdate, userToUpdate, res);
     } else {
       res.send({ message: "Error del servidor: " + err });
     }
   });
 };
 
+//endPoint para lectura de usuarios
 const readUser = (req, res) => {
   User.find({}, (err, docs) => {
     if (err) {
@@ -132,9 +116,9 @@ const readUser = (req, res) => {
   });
 };
 
+//endPoint para eliminar usuario
 const deleteUser = (req, res) => {
   const idToDelete = req.params.id;
-  //findOneAndRemove();
   User.findOneAndRemove({ _id: idToDelete }, (err, userDeleted) => {
     if (err) {
       res.status(500).send({ message: `Error en la BD: ${err}` });
@@ -146,9 +130,58 @@ const deleteUser = (req, res) => {
   });
 };
 
+
+//ToDo:...Falta funcion para loguear usuario
+const userLogin = ( req, res ) => {
+  //instrucciones para loguear usuario
+  const { body } = req
+  const { email , password } = body
+
+  //verificamos si el usuario existe o no
+  User.findOne( { email: email }, (err, userFinded) => {
+    if(err){
+      res.send( { message: 'Error del servidor: ' + err } )
+    }else if(!userFinded){
+      res.send( { message: 'Usuario o Password invalido op1' } )
+    }else {
+      //si el usuario fue encontrado verificamos que los password coincidan con la funcion compare de bcrypt
+      const passwordToCompare = password + salt //agregamos el valor de salt al password que viene en el body
+
+      bcrypt.compare( passwordToCompare, userFinded.password, (err, result) =>{
+        if(err){
+          res.send( { message: 'Error del servidor'})
+        } else if(!result) {
+          res.send ( { message: 'Usuario o Password invalido op2' } )
+        } else {
+          res.send( { message: 'Usuario Encontrado', user: userFinded } )
+        }
+      })
+
+    }
+  } )
+}
+
+//funcion auxiliar para optimizar el update del user
+const userFindAndUpdate = (id, update, res) => {
+  User.findByIdAndUpdate(id, update, { new: true }, (err, userUpdated) => {
+    if (err) {
+      res.status(500).send({ message: `Error del servidor: ${err}` });
+    } else if (!userUpdated) {
+      res.send({ message: "No se pudo actualizar usuario" });
+    } else {
+      res.send({
+        message: "Usuario actualizado correctamente",
+        user: userUpdated,
+      });
+    }
+  });
+};
+
+
 module.exports = {
   createUser,
   updateUser,
   readUser,
   deleteUser,
+  userLogin,
 };
