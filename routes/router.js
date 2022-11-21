@@ -1,5 +1,5 @@
 const express = require('express');
-const { createUser, updateUser, readUser, deleteUser } = require('../controllers/UserControllers');
+const { createUser, updateUser, readUser, deleteUser, userLogin } = require('../controllers/UserControllers');
 const router = express.Router();
 //importamos el modelo User
 const User = require("../models/UserModel");
@@ -15,6 +15,8 @@ router.get("/", (req, res) => {
   router.put('/updateUser/:id', updateUser )
   router.get('/getUsers', readUser )
   router.delete('/deleteUser/:id', deleteUser )
+  
+  router.post("/log-in", userLogin); //ruta para loguear usuario
 
   //exportamos al objeto router
   module.exports = router
