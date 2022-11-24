@@ -2,6 +2,7 @@ const User = require("../models/UserModel");
 const bcrypt = require('bcrypt')
 const salt = 'MisionTic2022'
 const saltRounds = 10
+const jwt = require('../services/TokenGenerator')
 
 //endPoint to create user
 const createUser = ({ body }, res) => {
@@ -138,22 +139,24 @@ const userLogin = ( req, res ) => {
   const { email , password } = body
 
   //verificamos si el usuario existe o no
-  User.findOne( { email: email }, (err, userFinded) => {
+  User.findOne( { email: email.toLowerCase() }, (err, userFinded) => {
     if(err){
       res.send( { message: 'Error del servidor: ' + err } )
     }else if(!userFinded){
-      res.send( { message: 'Usuario o Password invalido op1' } )
+      res.send( { message: 'Usuario o Password invalido' } )
     }else {
       //si el usuario fue encontrado verificamos que los password coincidan con la funcion compare de bcrypt
       const passwordToCompare = password + salt //agregamos el valor de salt al password que viene en el body
 
-      bcrypt.compare( passwordToCompare, userFinded.password, (err, result) =>{
+      bcrypt.compare( passwordToCompare , userFinded.password, (err, result) =>{
         if(err){
           res.send( { message: 'Error del servidor'})
         } else if(!result) {
-          res.send ( { message: 'Usuario o Password invalido op2' } )
+          res.send ( { message: 'Usuario o Password invalido' } )
         } else {
-          res.send( { message: 'Usuario Encontrado', user: userFinded } )
+          //creamos el token del usuario
+          const token = jwt.createAccessToken(userFinded)
+          res.send( { accessToken: token } )
         }
       })
 
